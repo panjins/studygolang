@@ -1,1 +1,2 @@
-STUDY GOLANG
+## 记录GO的学习过程
+
