@@ -126,7 +126,7 @@ func chooseConfig() {
 	// viper - 动态监控变化
 	v.WatchConfig()
 	v.OnConfigChange(func(e fsnotify.Event) {
-		fmt.Println("config file changed:",e.Name)
+		fmt.Println("config uploadfile changed:", e.Name)
 		_ = v.ReadInConfig()
 		_ = v.Unmarshal(&allsc)
 
@@ -134,5 +134,5 @@ func chooseConfig() {
 
 	})
 
-	time.Sleep(time.Second*200)
+	time.Sleep(time.Second * 200)
 }
