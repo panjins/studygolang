@@ -38,6 +38,49 @@ func main() {
 
 
 
+#### 2. channel
+
+Go语言中的通道(channel)是一种特殊的类型。通道像一个传送带或者队列，总是循环先进先出的规则，保证收发数据的顺序。每一个通道都是一个具体类型的导管，也就是声明channel的时候需要为其指定元素类型。
+
+
+
+#####  channel类型
+
+`channel`是一种引用类型，声明通道类型的格式如下
+
+```go
+var 变量 chan 元素类型
+```
+
+打个栗子：
+
+```go
+var ch1 chan int //表示声明一个传递整型的通道
+var ch2 chan bool //表示声明一个传递布尔类型的通道
+```
+
+
+
+##### 创建channel
+
+```go
+var ch chan int //channel 是引用类型，空值是nil
+fmt.Println(ch) //<nil> 声明的channel 需要使用make初始化后才能使用
+
+//使用make创建channel
+make(chan 元素类型,[缓冲大小])
+//打个栗子
+ch1 :=make(chan int)
+ch2 :=make(chan bool)
+
+```
+
+
+
+
+
+
+
 ## gin 框架
 
 ## gPRC
