@@ -1,0 +1,9 @@
+syntax  = "proto3";
+import "com.proto";
+import "google/protobuf/empty.proto";
+option go_package = ".;proto";
+
+service SendHi{
+  rpc Ping(Empty) returns (Pong);
+  rpc PingGoogle(google.protobuf.Empty) returns (Pong);
+}
