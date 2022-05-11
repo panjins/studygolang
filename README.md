@@ -164,3 +164,184 @@ service SendHi{
 
 #### 4.嵌套的message 对象
 
+
+
+
+
+## 常用库
+
+###  Viper
+
+Viper是适用于Go应用程序（包括`Twelve-Factor App`）的完整配置解决方案。它被设计用于在应用程序中工作，并且可以处理所有类型的配置需求和格式。它支持以下特性：
+
+- 设置默认值
+- 从`JSON`、`TOML`、`YAML`、`HCL`、`envfile`和`Java properties`格式的配置文件读取配置信息
+- 实时监控和重新读取配置文件（可选）
+- 从环境变量中读取
+- 从远程配置系统（etcd或Consul）读取并监控配置变化
+- 从命令行参数读取配置
+- 从buffer读取配置
+- 显式配置值
+
+
+
+#### 1. Viper 的安装
+
+```go
+go get github.com/spf13/viper
+```
+
+
+
+#### 2.Viper 读取配置文件
+
+
+
+```go
+viper.SetConfigFile("./config.yaml") // 指定配置文件路径
+viper.SetConfigName("config") // 配置文件名称(无扩展名)
+viper.SetConfigType("yaml") // 如果配置文件的名称中没有扩展名，则需要配置此项
+viper.AddConfigPath("/etc/appname/")   // 查找配置文件所在的路径
+viper.AddConfigPath("$HOME/.appname")  // 多次调用以添加多个搜索路径
+viper.AddConfigPath(".")               // 还可以在工作目录中查找配置
+err := viper.ReadInConfig() // 查找并读取配置文件
+if err != nil { // 处理读取配置文件的错误
+	panic(fmt.Errorf("Fatal error config file: %s \n", err))
+}
+```
+
+
+
+打个栗子：
+
+```go
+// 读取yaml配置文件 并将配置文件映射到单层struct
+type ServerConfig struct {
+	ServiceName string `mapstructure:"name"`
+	Port        int    `mapstructure:"port"`
+}
+
+// 读取yaml 文件配置
+func readYaml() {
+	v := viper.New()
+
+	// 指定文件路径
+	v.SetConfigFile(".\\config\\config.yaml")
+
+	// 查找阅读配置文件并处理错误信息
+	if err := v.ReadInConfig(); err != nil {
+		panic(err)
+	}
+
+	// 将配置文件映射到struct
+	sc := ServerConfig{}
+	if err := v.Unmarshal(&sc); err != nil {
+		panic(err)
+	}
+	fmt.Println(sc)
+
+	// 直接输出配置文件信息
+	name := v.Get("name")
+	port := v.Get("port")
+	fmt.Println(name)
+	fmt.Println(port)
+}
+
+```
+
+
+
+在打个栗子:
+
+```go
+// 读取yaml 多层配置信息并映射到嵌套结构体
+
+type MysqlConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+}
+
+type allServerConfig struct {
+	ServiceName string      `mapstructure:"name"`
+	Port        int         `mapstructure:"port"`
+	MysqlInfo   MysqlConfig `mapstructure:"mysql"`
+}
+
+func readMoreYaml() {
+	v := viper.New()
+
+	// 指定文件路径
+	v.SetConfigFile(".\\config\\config.yaml")
+
+	// 查找阅读配置文件并处理错误信息
+	if err := v.ReadInConfig(); err != nil {
+		panic(err)
+
+	}
+
+	// 将配置文件映射到struct
+	allsc := allServerConfig{}
+	if err := v.Unmarshal(&allsc); err != nil {
+		panic(err)
+	}
+	fmt.Println(allsc)
+
+}
+```
+
+
+
+#### 3.Viper读取环境变量
+
+```go
+// 将线上线下配置文件进行隔离
+// 不用改任何代码 而且线上线下的配置文件能隔离开
+// 通过环境变量实现此功能
+
+func GetEnvInfo(env string) bool {
+	viper.AutomaticEnv()
+	return viper.GetBool(env)
+}
+
+func chooseConfig() {
+	debug := GetEnvInfo("CONFIG_DEBUG")
+	configFileName := ".\\config\\config.yaml"
+
+	if !debug {
+		configFileName = ".\\config\\config_local.yaml"
+	}
+
+	v := viper.New()
+
+	// 指定文件路径
+	v.SetConfigFile(configFileName)
+
+	// 查找阅读配置文件并处理错误信息
+	if err := v.ReadInConfig(); err != nil {
+		panic(err)
+
+	}
+
+	// 将配置文件映射到struct
+	allsc := allServerConfig{}
+	if err := v.Unmarshal(&allsc); err != nil {
+		panic(err)
+	}
+	fmt.Println(allsc)
+
+	// viper - 动态监控变化
+	v.WatchConfig()
+	v.OnConfigChange(func(e fsnotify.Event) {
+		fmt.Println("config uploadfile changed:", e.Name)
+		_ = v.ReadInConfig()
+		_ = v.Unmarshal(&allsc)
+
+		fmt.Println(allsc)
+
+	})
+
+	time.Sleep(time.Second * 200)
+}
+
+```
+
