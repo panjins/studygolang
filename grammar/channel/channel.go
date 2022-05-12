@@ -1,46 +1,75 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 //channel 通道
 
+/*
+	通道分为无缓冲通道和有缓冲通道
+	 无缓冲通道:
+	无缓冲通道(阻塞通道 同步通道） 必须要有接受方
+
+	有缓冲通道：
+	有缓冲区的通道
+
+
+*/
+
 func main() {
-	//	1.无缓冲的通道 同步通道
-	/*
-		var ch chan int //int 表示通道中的元素是int 类型
-		fmt.Println("未初始化", ch)
+	//无缓冲通道栗子
+	ch := make(chan int)
+	go rev(ch) //启用goroutine 从通道接受值
+	ch <- 10
+	close(ch)
 
-		//	初始化通道
-		ch = make(chan int)
-		fmt.Println("初始化通道", ch)
+	//有缓冲通道
+	ch2 := make(chan int, 1) //创建一个缓冲区容量为1的缓冲通道
+	ch2 <- 10
+	fmt.Println("发送成功")
 
-	*/
-	ch := make(chan int) //定义并初始化通道
+	//	for range 从通道中循环取值
+	rangechannel()
 
+}
+
+func rev(c chan int) {
+	ret := <-c
+	fmt.Println("接受成功", ret)
+}
+
+//for range 从通道循环取值
+
+func rangechannel() {
+	ch := make(chan int)
+	ch1 := make(chan int)
+
+	//向通道中发送值
 	go func() {
-		//从通道接受数据
-		fmt.Println("从通道中接受数据ch:", <-ch)
+		for i := 0; i < 100; i++ {
+			ch <- i
+		}
+		close(ch)
 	}()
 
-	//向通道发送数据
-	ch <- 100
+	//	接受值
 
-	//	2.缓冲通道，不是同步通道
+	go func() {
+		for {
+			i, ok := <-ch //通道关闭后再取值 ok = false
+			if !ok {
+				break
+			}
 
-	/*
-		1.不能向已关闭的通道中读取数据
-		2. 缓冲区满的时候不能发送数据
-		3. 缓冲区为空时不能读取数据
+			ch1 <- i * i
 
-	*/
+		}
+		close(ch1)
+	}()
 
-	ch2 := make(chan int, 3) //3表示缓冲区可以存放3个元素
-	ch2 <- 1
-	ch2 <- 2
-	ch2 <- 3
-
-	for i := 0; i < 3; i++ {
-		fmt.Println("从通道中读取的数据", <-ch2)
+	//主goroutine中从ch1中接受打印值
+	for v := range ch1 { //通道关闭后会推出for range循环
+		fmt.Println(v)
 	}
-
 }
