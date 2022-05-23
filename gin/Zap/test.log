@@ -1,0 +1,7 @@
+{"level":"error","ts":1652520013.7855062,"msg":"Error fetching url..","url":"www.google.com","error":"Get \"www.google.com\": unsupported protocol scheme \"\""}
+{"level":"info","ts":1652520014.6779149,"msg":"success...","StatusCode":"200 OK","url":"https://baidu.com"}
+{"level":"ERROR","ts":"2022-05-14T17:29:44.239+0800","msg":"Error fetching url..","url":"www.google.com","error":"Get \"www.google.com\": unsupported protocol scheme \"\""}
+{"level":"INFO","ts":"2022-05-14T17:29:44.428+0800","msg":"success...","StatusCode":"200 OK","url":"https://baidu.com"}
+{"level":"ERROR","ts":"2022-05-14T17:38:12.611+0800","caller":"loggerwriter/Logger.go:60","msg":"Error fetching url..","url":"www.google.com","error":"Get \"www.google.com\": unsupported protocol scheme \"\""}
+{"level":"INFO","ts":"2022-05-14T17:38:12.811+0800","caller":"loggerwriter/Logger.go:65","msg":"success...","StatusCode":"200 OK","url":"https://baidu.com"}
+{"level":"INFO","ts":"2022-05-14T18:23:56.174+0800","caller":"ginlogger/main.go:71","msg":"/hello","status":200,"method":"GET","path":"/hello","query":"","ip":"::1","user-agent":"PostmanRuntime/7.29.0","errors":"","cost":0}

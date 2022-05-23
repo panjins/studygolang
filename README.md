@@ -75,9 +75,112 @@ ch2 :=make(chan bool)
 
 ```
 
+##### channel类型
+
+1. 有缓冲通道
+2. 无缓冲通道(阻塞通道，同步通道) 必须要有接收方
+
+```go
+func main() {
+	//无缓冲通道栗子
+	ch := make(chan int)
+	go rev(ch) //启用goroutine 从通道接受值
+	ch <- 10
+	close(ch)
+
+	//有缓冲通道
+	ch2 := make(chan int, 1) //创建一个缓冲区容量为1的缓冲通道
+	ch2 <- 10
+	fmt.Println("发送成功")
+
+	//	for range 从通道中循环取值
+	rangechannel()
+
+}
+
+func rev(c chan int) {
+	ret := <-c
+	fmt.Println("接受成功", ret)
+}
+
+//for range 从通道循环取值
+
+func rangechannel() {
+	ch := make(chan int)
+	ch1 := make(chan int)
+
+	//向通道中发送值
+	go func() {
+		for i := 0; i < 100; i++ {
+			ch <- i
+		}
+		close(ch)
+	}()
+
+	//	接受值
+
+	go func() {
+		for {
+			i, ok := <-ch //通道关闭后再取值 ok = false
+			if !ok {
+				break
+			}
+
+			ch1 <- i * i
+
+		}
+		close(ch1)
+	}()
+
+	//主goroutine中从ch1中接受打印值
+	for v := range ch1 { //通道关闭后会推出for range循环
+		fmt.Println(v)
+	}
+}
+
+```
 
 
 
+##### 单向通道
+
+`chan<- int`是一个只写单向通道（只能对其写入int类型值），可以对其执行发送操作但是不能执行接收操作。
+`<-chan in`t是一个只读单向通道（只能从其读取int类型值），可以对其执行接收操作但是不能执行发送操作。
+
+打个栗子：
+
+```go
+func main() {
+	ch1 := make(chan int)
+	ch2 := make(chan int)
+
+	go counter(ch1)      //数据写入ch1
+	go squarer(ch2, ch1) //把ch1中的数据 写入ch2
+	printer(ch2)         //输出 ch2中的数据
+
+}
+
+func counter(out chan<- int) {
+	for i := 0; i < 100; i++ {
+		out <- i
+	}
+	close(out)
+
+}
+
+func squarer(out chan<- int, in <-chan int) {
+	for i := range in {
+		out <- i * i
+	}
+}
+
+func printer(in <-chan int) {
+	for i := range in {
+		fmt.Println(i)
+	}
+
+}
+```
 
 
 
@@ -96,7 +199,7 @@ import (
 func main() {
 	r := gin.Default()
 
-	v1 := r.Group("/hh")
+	v1 := r.Group("/hh") //路由组
 	{
 		v1.POST("/hi", Login)
 		v1.GET("/ha", func(c *gin.Context) {
@@ -381,3 +484,329 @@ func chooseConfig() {
 
 ```
 
+
+
+
+
+### Zap日志库
+
+[Zap](https://github.com/uber-go/zap)是非常快的、结构化的，分日志级别的Go日志库。
+
+
+
+#### 1. Zap安装
+
+```go
+go get -u go.uber.org/zap
+```
+
+
+
+#### 2.配置Logger
+
+定制化Logger,将日志写入文件而不是终端。
+
+我们将使用`zap.New(…)`方法来手动传递所有配置，而不是使用像`zap.NewProduction()`这样的预置方法来创建logger。
+
+```go
+func New(core zapcore.Core, options ...Option) *Logger
+```
+
+`zapcore.Core`需要三个配置——`Encoder`，`WriteSyncer`，`LogLevel`。
+
+1.**Encoder**:编码器(如何写入日志)。我们将使用开箱即用的`NewJSONEncoder()`，并使用预先设置的`ProductionEncoderConfig()`。
+
+```go
+   zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+```
+
+2.**WriterSyncer** ：指定日志将写到哪里去。我们使用`zapcore.AddSync()`函数并且将打开的文件句柄传进去。
+
+```go
+   file, _ := os.Create("./test.log")
+   writeSyncer := zapcore.AddSync(file)
+```
+
+3.**Log Level**：哪种级别的日志将被写入。
+
+我们将修改上述部分中的Logger代码，并重写`InitLogger()`方法。其余方法—`main()` /`SimpleHttpGet()`保持不变。
+
+
+
+打个栗子：
+
+```go
+var logger *zap.Logger
+
+func main() {
+	InitLogger()
+	defer logger.Sync()
+	simpleHttpGet("www.google.com")
+	simpleHttpGet("https://baidu.com")
+
+}
+
+func InitLogger() {
+	writeSyncer := getLogWriter()
+	encoder := getEncoder()
+	core := zapcore.NewCore(encoder, writeSyncer, zapcore.DebugLevel)
+	logger = zap.New(core, zap.AddCaller()) //AddCaller() 函数调用方信息
+
+}
+
+func getEncoder() zapcore.Encoder {
+	//返回人能看懂的时间格式
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+
+	return zapcore.NewJSONEncoder(encoderConfig)//设置日志格式为Json格式 
+    //若不想使用Json格式的日志，return zapcore.NewConsoleEncoder(encoderConfig)
+}
+
+
+//这里使用Lumberjack对日志进行切割，日志写入文件
+
+func getLogWriter() zapcore.WriteSyncer {
+	lumberJackLogger := &lumberjack.Logger{
+		Filename:   "./test.log",
+		MaxSize:    100,   //M
+		MaxBackups: 5,     //备份数量
+		MaxAge:     30,    //保留旧文件最大天数
+		Compress:   false, //是否压缩归档旧文件
+	}
+	return zapcore.AddSync(lumberJackLogger)
+}
+
+func simpleHttpGet(url string) {
+	resp, err := http.Get(url)
+	if err != nil {
+		logger.Error(
+			"Error fetching url..",
+			zap.String("url", url),
+			zap.Error(err))
+	} else {
+		logger.Info("success...", zap.String(
+			"StatusCode", resp.Status), zap.String("url", url))
+		resp.Body.Close()
+	}
+}
+
+```
+
+
+
+#### 3.Gin中使用Zap日志库
+
+1. 首先使用根据Zap封装好的Logger中间件，替换原有的中间件。
+
+```go
+// GinLogger 接收gin框架默认的日志
+func GinLogger(logger *zap.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		query := c.Request.URL.RawQuery
+		c.Next()
+
+		cost := time.Since(start)
+		logger.Info(path,
+			zap.Int("status", c.Writer.Status()),
+			zap.String("method", c.Request.Method),
+			zap.String("path", path),
+			zap.String("query", query),
+			zap.String("ip", c.ClientIP()),
+			zap.String("user-agent", c.Request.UserAgent()),
+			zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
+			zap.Duration("cost", cost),
+		)
+	}
+}
+
+// GinRecovery recover掉项目可能出现的panic
+func GinRecovery(logger *zap.Logger, stack bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Check for a broken connection, as it is not really a
+				// condition that warrants a panic stack trace.
+				var brokenPipe bool
+				if ne, ok := err.(*net.OpError); ok {
+					if se, ok := ne.Err.(*os.SyscallError); ok {
+						if strings.Contains(strings.ToLower(se.Error()), "broken pipe") || strings.Contains(strings.ToLower(se.Error()), "connection reset by peer") {
+							brokenPipe = true
+						}
+					}
+				}
+
+				httpRequest, _ := httputil.DumpRequest(c.Request, false)
+				if brokenPipe {
+					logger.Error(c.Request.URL.Path,
+						zap.Any("error", err),
+						zap.String("request", string(httpRequest)),
+					)
+					// If the connection is dead, we can't write a status to it.
+					c.Error(err.(error)) // nolint: errcheck
+					c.Abort()
+					return
+				}
+
+				if stack {
+					logger.Error("[Recovery from panic]",
+						zap.Any("error", err),
+						zap.String("request", string(httpRequest)),
+						zap.String("stack", string(debug.Stack())),
+					)
+				} else {
+					logger.Error("[Recovery from panic]",
+						zap.Any("error", err),
+						zap.String("request", string(httpRequest)),
+					)
+				}
+				c.AbortWithStatus(http.StatusInternalServerError)
+			}
+		}()
+		c.Next()
+	}
+}
+```
+
+
+
+打个栗子：
+
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/natefinch/lumberjack"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"net"
+	"net/http"
+	"net/http/httputil"
+	"os"
+	"runtime/debug"
+	"strings"
+	"time"
+)
+
+var logger *zap.Logger
+
+func main() {
+	InitLogger()
+
+	r := gin.New()
+
+	r.Use(GinLogger(logger), GinRecovery(logger, true))
+
+	r.GET("/hello", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"hello": "world",
+		})
+	})
+	r.Run()
+}
+
+func InitLogger() {
+	writeSyncer := getLogWriter()
+	encoder := getEncoder()
+	core := zapcore.NewCore(encoder, writeSyncer, zapcore.DebugLevel)
+	logger = zap.New(core, zap.AddCaller()) //AddCaller() 函数调用方信息
+
+}
+
+func getEncoder() zapcore.Encoder {
+	//返回人能看懂的时间格式
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+
+	return zapcore.NewJSONEncoder(encoderConfig)
+}
+
+func getLogWriter() zapcore.WriteSyncer {
+	lumberJackLogger := &lumberjack.Logger{
+		Filename:   "ginlogger/test.log",
+		MaxSize:    100,   //M
+		MaxBackups: 5,     //备份数量
+		MaxAge:     30,    //保留旧文件最大天数
+		Compress:   false, //是否压缩归档旧文件
+	}
+	return zapcore.AddSync(lumberJackLogger)
+}
+
+// GinLogger 接收gin框架默认的日志
+func GinLogger(logger *zap.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		query := c.Request.URL.RawQuery
+		c.Next()
+
+		cost := time.Since(start)
+		logger.Info(path,
+			zap.Int("status", c.Writer.Status()),
+			zap.String("method", c.Request.Method),
+			zap.String("path", path),
+			zap.String("query", query),
+			zap.String("ip", c.ClientIP()),
+			zap.String("user-agent", c.Request.UserAgent()),
+			zap.String("errors", c.Errors.ByType(gin.ErrorTypePrivate).String()),
+			zap.Duration("cost", cost),
+		)
+	}
+}
+
+// GinRecovery recover掉项目可能出现的panic
+func GinRecovery(logger *zap.Logger, stack bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Check for a broken connection, as it is not really a
+				// condition that warrants a panic stack trace.
+				var brokenPipe bool
+				if ne, ok := err.(*net.OpError); ok {
+					if se, ok := ne.Err.(*os.SyscallError); ok {
+						if strings.Contains(strings.ToLower(se.Error()), "broken pipe") || strings.Contains(strings.ToLower(se.Error()), "connection reset by peer") {
+							brokenPipe = true
+						}
+					}
+				}
+
+				httpRequest, _ := httputil.DumpRequest(c.Request, false)
+				if brokenPipe {
+					logger.Error(c.Request.URL.Path,
+						zap.Any("error", err),
+						zap.String("request", string(httpRequest)),
+					)
+					// If the connection is dead, we can't write a status to it.
+					c.Error(err.(error)) // nolint: errcheck
+					c.Abort()
+					return
+				}
+
+				if stack {
+					logger.Error("[Recovery from panic]",
+						zap.Any("error", err),
+						zap.String("request", string(httpRequest)),
+						zap.String("stack", string(debug.Stack())),
+					)
+				} else {
+					logger.Error("[Recovery from panic]",
+						zap.Any("error", err),
+						zap.String("request", string(httpRequest)),
+					)
+				}
+				c.AbortWithStatus(http.StatusInternalServerError)
+			}
+		}()
+		c.Next()
+	}
+}
+```
+
+
+
+ 

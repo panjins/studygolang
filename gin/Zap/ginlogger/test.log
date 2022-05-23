@@ -1,0 +1,1 @@
+{"level":"INFO","ts":"2022-05-14T18:26:25.609+0800","caller":"ginlogger/main.go:71","msg":"/hello","status":200,"method":"GET","path":"/hello","query":"","ip":"::1","user-agent":"PostmanRuntime/7.29.0","errors":"","cost":0}
